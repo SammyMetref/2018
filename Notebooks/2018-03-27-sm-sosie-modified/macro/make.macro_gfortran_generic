@@ -1,0 +1,27 @@
+# Makefile for SOSIE
+# ==================
+
+# Fortran compiler :
+FC =gfortran 
+
+# NetCDF is given to Makefile by nf-config
+#NETCDF_DIR = /usr/local/Cellar/netcdf/4.6.1
+
+# Linking argument: usually "-lnetcdff", "-lnetcdf" or "-lnetcdf -lnetcdff" :
+L_NCDF = -lnetcdff -lnetcdf
+
+# Fortran compilation flags:
+# -- Production
+#FF = -O3 -ffree-line-length-200 -J./mod -I./mod
+# -- Debugging
+#FF = -g -O0 -ffree-line-length-200 -J./mod -I./mod -w -fbounds-check
+
+#FF = -O2 -J./mod -I./mod -ffree-line-length-164 -lgfortran #-fdefault-integer-4
+# -- Debugging
+#FF = -O0 -J./mod -I./mod -w -fbounds-check -ffree-line-length-164 -lgfortran
+
+FF = -g -O0 -ffree-line-length-200 -J./mod -I./mod -w -fbounds-check
+
+# Directory to install binaries :
+INSTALL_DIR = .
+

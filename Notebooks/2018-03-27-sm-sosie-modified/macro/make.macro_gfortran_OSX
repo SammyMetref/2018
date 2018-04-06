@@ -1,0 +1,26 @@
+# Makefile for SOSIE with gfortan (version >= 4.4) on Mac OSX
+# ==========================================================
+#
+# Thanks to feedbacks from Denise Worthen @ NASA
+
+
+# Fortran compiler:
+FC = /usr/local/bin/gfortran 
+
+# Root directory for Netcdf:
+NETCDF_DIR = /usr/local/Cellar/netcdf/4.6.1
+# netcf libraries are in: <NETCDF_DIR>/lib/
+# netcdf module 'netcdf.mod' in: <NETCDF_DIR>/include/
+
+# Linking argument: usually "-lnetcdff", "-lnetcdf" or "-lnetcdf -lnetcdff" :
+L_NCDF = -lnetcdff -lnetcdf
+
+# Fortran compilation flags:
+# -- Production
+#FF = -O2 -J./mod -I./mod -ffree-line-length-164 -lgfortran #-fdefault-integer-4
+# -- Debugging
+FF = -O0 -J./mod -I./mod -w -fbounds-check -ffree-line-length-164 -lgfortran
+
+# Directory to install binaries:
+INSTALL_DIR = .
+
