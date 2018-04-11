@@ -1,15 +1,14 @@
 ################################
 #       Analysis functions        #
 ################################ 
-import sys,os,shutil
-sys.path.insert(0,'/Users/sammymetref/Documents/Boost-Swot/Notebooks/GitHub/Personal_Files/2018/Scripts/2018-03-15-sm-qgsw-DI-master-modified/2018-03-27-sm-SWOT_DA/') 
+import sys,os,shutil 
 import numpy as np 
 import netCDF4 as nc 
 import matplotlib.pylab as plt
 
 from Observations import *
  
-from params import *
+from params import * 
  
 
 ############################
@@ -63,6 +62,8 @@ def NoAnalysis(state_vectors_names,obs_file,tmp_DA_path,sosie_path,name_sosie_ou
 
     """      
     
+    
+    
     analyzed_vectors_names=tmp_DA_path+'state_analyzed.nc'
     
     cmd1="cp "+state_vectors_names+" "+analyzed_vectors_names 
@@ -70,10 +71,10 @@ def NoAnalysis(state_vectors_names,obs_file,tmp_DA_path,sosie_path,name_sosie_ou
     
     return analyzed_vectors_names
 
-def Replacement(state_vectors_names,obs_file,tmp_DA_path,sosie_path,name_sosie_output,name_sosie_map,n_ens,obsop): 
+def DirectInsertion(state_vectors_names,obs_file,tmp_DA_path,sosie_path,name_sosie_output,name_sosie_map,n_ens,obsop): 
     """
     NAME 
-        Replacement
+        DirectInsertion
 
     DESCRIPTION 
         Function replacing state vectors by observations
@@ -93,39 +94,32 @@ def Replacement(state_vectors_names,obs_file,tmp_DA_path,sosie_path,name_sosie_o
 
     """      
     
-    
     analyzed_vectors_names=tmp_DA_path+'state_analyzed.nc'
-    
      
-    # Test innovation 
-    #innov=Innovation(state_vectors_names,obs_file,tmp_DA_path,sosie_path,name_sosie_output,name_sosie_map,n_ens,obsop)
     
     n_var=1                               # To be moved to Exp1_params.py
     name_var=["degraded_sossheig"]        # To be moved to Exp1_params.py
     
-    for i_var in range(n_var):
-        fid_deg = nc.Dataset(state_vectors_names)
-        lon2d=np.array(fid_deg.variables["nav_lon"][:,:]) 
-        lat2d=np.array(fid_deg.variables["nav_lat"][:,:])   
-        forecast=np.array(fid_deg.variables[name_var[i_var]][:,:,:]) 
+    # Retrieve forecast as ensemble of state vectors
+    [forecast,lon2d,lat2d] = EnsState_vectorize(state_vectors_names,n_ens,n_var,name_var) 
     
-    ncout = nc.Dataset(analyzed_vectors_names, 'w', format='NETCDF3_CLASSIC')
-    ncout.createDimension('member', n_ens)
-    ncens = ncout.createVariable('ens', 'd', ('member',))
-    ncens[:] = range(n_ens) 
-    ncout.createDimension('x', lon2d.shape[0])
-    ncout.createDimension('y', lat2d.shape[1])   
-    nclon = ncout.createVariable('nav_lon', 'f', ('x','y',))
-    nclat = ncout.createVariable('nav_lat', 'f', ('x','y',))  
-    for i_var in range(n_var):
-        nchei = ncout.createVariable(name_var[i_var], 'f', ('member','x','y',)) 
-    nclat[:,:] = lat2d 
-    nclon[:,:] = lon2d   
-    nchei[:,:,:] = forecast
+    # Retrieve observation as ensemble of state vectors (H^{-1})
+    obs_inv_file=obs_file[:-3]+"_inv.nc"
+    [obs_inv,lon2d,lat2d] = EnsState_vectorize(obs_inv_file,1,n_var,["ssh"],name_lon="nav_lon",name_lat="nav_lat")#,name_var) 
+    # Note: The inverse observations must be created offline (2018-03-27-sm-pretreatment-SWOTinputs)
+      
+    # Analysis default definition 
+    analysis = np.zeros_like(forecast)
+    analysis[:,:]=forecast[:,:]
      
+          
+    for i_ens in range(n_ens):
+        analysis[i_ens,obs_inv[0,:]>-50] = obs_inv[0,obs_inv[0,:]>-50]  
+         
     
-    ncout.close()
-        
+    EnsStateVector_save(analysis,lon2d,lat2d,n_ens,n_var,name_var,analyzed_vectors_names) 
+    
+      
     
     return analyzed_vectors_names
 
@@ -133,7 +127,7 @@ def Replacement(state_vectors_names,obs_file,tmp_DA_path,sosie_path,name_sosie_o
 def Nudging(state_vectors_names,obs_file,tmp_DA_path,sosie_path,name_sosie_output,name_sosie_map,n_ens,obsop): 
     """
     NAME 
-        Replacement
+        Replacement 
 
     DESCRIPTION 
         Function replacing state vectors by observations
@@ -160,54 +154,25 @@ def Nudging(state_vectors_names,obs_file,tmp_DA_path,sosie_path,name_sosie_outpu
     n_var=1                               # To be moved to Exp1_params.py
     name_var=["degraded_sossheig"]        # To be moved to Exp1_params.py
     
-    fid_deg = nc.Dataset(state_vectors_names)
-    lon2d=np.array(fid_deg.variables["nav_lon"][:,:])
-    lat2d=np.array(fid_deg.variables["nav_lat"][:,:]) 
-    n_tot=n_var*np.shape(lon2d)[0]*np.shape(lat2d)[1]
-    forecast=np.zeros([n_ens,n_tot],)
+    # Retrieve forecast as ensemble of state vectors
+    [forecast,lon2d,lat2d] = EnsState_vectorize(state_vectors_names,n_ens,n_var,name_var) 
     
-    i_tot=0
-    for i_var in range(n_var):  
-        for i_lon in range(np.shape(lon2d)[0]):
-            for j_lat in range(np.shape(lat2d)[1]):
-                forecast[:,i_tot]=np.array(fid_deg.variables[name_var[i_var]][:,i_lon,j_lat]) 
-                i_tot=i_tot+1
-                
-    # TO DO 
-    # - Create a function VectorializeState
-    # - Create a function VectorializeInnov or Obs (if necessary)
-    # - Create a function computing H^{-1}y-x from netcdf using sosie if possible
-    # - Putting the output in VectorializeState() = X_update
-    # - X_analysis = X_forecast + K(?) * X_update
+    # Retrieve observation as ensemble of state vectors (H^{-1})
+    obs_inv_file=obs_file[:-3]+"_inv.nc"
+    [obs_inv,lon2d,lat2d] = EnsState_vectorize(obs_inv_file,1,n_var,["ssh"],name_lon="nav_lon",name_lat="nav_lat")#,name_var) 
+    # Note: The inverse observations must be created offline (2018-03-27-sm-pretreatment-SWOTinputs)
+     
+    # Analysis default definition 
+    analysis = np.zeros_like(forecast)
+    analysis[:,:]=forecast[:,:]
+      
+    for i_ens in range(n_ens):
+        analysis[i_ens,obs_inv[0,:]>-50] = obs_inv[0,obs_inv[0,:]>-50]  
+         
     
+    EnsStateVector_save(analysis,lon2d,lat2d,n_ens,n_var,name_var,analyzed_vectors_names) 
     
-    analysis = forecast 
-    
-    ncout = nc.Dataset(analyzed_vectors_names, 'w', format='NETCDF3_CLASSIC')
-    ncout.createDimension('member', n_ens)
-    ncens = ncout.createVariable('ens', 'd', ('member',))
-    ncens[:] = range(n_ens) 
-    ncout.createDimension('x', lon2d.shape[0])
-    ncout.createDimension('y', lat2d.shape[1])   
-    nclon = ncout.createVariable('nav_lon', 'f', ('x','y',))
-    nclat = ncout.createVariable('nav_lat', 'f', ('x','y',))  
-    nclat[:,:] = lat2d 
-    nclon[:,:] = lon2d   
-    i_tot=0
-    for i_var in range(n_var):
-        nchei = ncout.createVariable(name_var[i_var], 'f', ('member','x','y',)) 
-        for i_lon in range(np.shape(lon2d)[0]):
-            for j_lat in range(np.shape(lat2d)[1]):
-                nchei[:,i_lon,j_lat] = analysis[:,i_tot]
-                i_tot=i_tot+1
-        if False:        
-            plt.figure()
-            plt.pcolormesh(lon2d,lat2d,nchei[0,:,:])
-            plt.show()
-            feojof
-    
-    ncout.close()
-        
+      
     
     return analyzed_vectors_names
 
@@ -268,4 +233,93 @@ def Innovation(state_vectors_names,obs_file,tmp_DA_path,sosie_path,name_sosie_ou
     
     return innov
 
+
+def EnsState_vectorize(state_vectors_names,n_ens,n_var,name_var,name_lon="nav_lon",name_lat="nav_lat"):
+    """
+    NAME 
+        EnsState_vectorize
+
+    DESCRIPTION 
+        Create a 2D-array of [ensemble members, total variables]
+
+        Args: 
+            state_vectors_names (string): path and name of the current state_vectors file        
+            n_ens (integer): number of ensemble members
+            n_var (integer): number of state variables
+            name_var (list of strings): names of state variables
+ 
+
+        Returns: 
+            state_vectors (2D-array): 'n_ens' vectors of the vectorize ensemble member states
+
+    """       
+    
+    fid_deg = nc.Dataset(state_vectors_names)
+    lon=np.array(fid_deg.variables[name_lon][:,:])
+    lat=np.array(fid_deg.variables[name_lat][:,:]) 
+    n_tot=n_var*np.shape(lon)[0]*np.shape(lat)[1]
+    state_vectors=np.zeros([n_ens,n_tot],)
+     
+    
+    i_tot=0
+    for i_var in range(n_var):  
+        for i_lon in range(np.shape(lon)[0]):
+            for j_lat in range(np.shape(lat)[1]):
+                state_vectors[:,i_tot]=np.array(fid_deg.variables[name_var[i_var]][:,i_lon,j_lat]) 
+                i_tot=i_tot+1
+                
+    return [state_vectors, lon, lat]
+            
+
+def EnsStateVector_save(state_vectors,lon,lat,n_ens,n_var,name_var,state_vectors_names):
+    """
+    NAME 
+        EnsStateVector_save
+
+    DESCRIPTION 
+        Save a netcdf file from a 2D-array of [ensemble members, total variables]
+
+        Args: 
+            state_vectors_names (string): path and name of the current state_vectors file   
+            lon (array): longitud of state_vectors 
+            lat (array): latitud of state_vectors
+            n_ens (integer): number of ensemble members
+            n_var (integer): number of state variables
+            name_var (list of strings): names of state variables
+            state_vectors_names (string): name of 'EnsStateVector_save' saved file
+ 
+
+        Returns: 
+            state_vectors (2D-array): 'n_ens' vectors of the vectorize ensemble member states
+
+    """      
+
+
+    ncout = nc.Dataset(state_vectors_names, 'w', format='NETCDF3_CLASSIC')
+    ncout.createDimension('member', n_ens)
+    ncens = ncout.createVariable('ens', 'd', ('member',))
+    ncens[:] = range(n_ens) 
+    ncout.createDimension('x', lon.shape[0])
+    ncout.createDimension('y', lat.shape[1])   
+    nclon = ncout.createVariable('nav_lon', 'f', ('x','y',))
+    nclat = ncout.createVariable('nav_lat', 'f', ('x','y',))  
+    nclat[:,:] = lat
+    nclon[:,:] = lon   
+    i_tot=0
+    for i_var in range(n_var):
+        nchei = ncout.createVariable(name_var[i_var], 'f', ('member','x','y',)) 
+        for i_lon in range(np.shape(lon)[0]):
+            for j_lat in range(np.shape(lat)[1]):
+                nchei[:,i_lon,j_lat] = state_vectors[:,i_tot]
+                i_tot=i_tot+1
+                
+    if False: 
+        plt.figure()
+        plt.pcolormesh(lon,lat,nchei[0,:,:])
+        plt.colorbar()
+        plt.show()
+    
+    ncout.close()
+                
+    return
 

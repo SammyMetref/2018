@@ -2,7 +2,7 @@
 #       Model functions        #
 ################################ 
 import sys,os,shutil
-sys.path.insert(0,'/home/jovyan/work/Boost-SWOT/2018/Notebooks/2018-03-27-sm-SWOT_DA/') 
+sys.path.insert(0,'/home/metrefs/Boost-SWOT/2018/Notebooks/2018-03-27-sm-SWOT_DA/') 
 import numpy as np 
 import netCDF4 as nc
 
