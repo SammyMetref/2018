@@ -8,7 +8,7 @@ import matplotlib.pylab as plt
 
 from Observations import *
  
-from params import * 
+#from params import * 
  
 
 ############################
@@ -124,7 +124,7 @@ def DirectInsertion(state_vectors_names,obs_file,tmp_DA_path,sosie_path,name_sos
     return analyzed_vectors_names
 
 
-def Nudging(state_vectors_names,obs_file,tmp_DA_path,sosie_path,name_sosie_output,name_sosie_map,n_ens,obsop): 
+def Nudging(state_vectors_names,obs_file,tmp_DA_path,sosie_path,name_sosie_output,name_sosie_map,n_ens,obsop,nudging_coef0): 
     """
     NAME 
         Replacement 
@@ -140,6 +140,8 @@ def Nudging(state_vectors_names,obs_file,tmp_DA_path,sosie_path,name_sosie_outpu
             name_sosie_output (string): name of sosie output 
             name_sosie_map (string): name of sosie map (2nd sosie output)
             n_ens (integer): number of ensemble members
+            obsop (function): observation operator
+            nudging_coef0 (float): nudging coefficient defined in 'Exp*_params.py'
  
 
         Returns: 
@@ -167,7 +169,7 @@ def Nudging(state_vectors_names,obs_file,tmp_DA_path,sosie_path,name_sosie_outpu
     analysis[:,:]=forecast[:,:]
       
     for i_ens in range(n_ens):
-        analysis[i_ens,obs_inv[0,:]>-50] = obs_inv[0,obs_inv[0,:]>-50]  
+        analysis[i_ens,obs_inv[0,:]>-50] = (1-nudging_coef0)*analysis[i_ens,obs_inv[0,:]>-50] + nudging_coef0 * obs_inv[0,obs_inv[0,:]>-50]  
          
     
     EnsStateVector_save(analysis,lon2d,lat2d,n_ens,n_var,name_var,analyzed_vectors_names) 
